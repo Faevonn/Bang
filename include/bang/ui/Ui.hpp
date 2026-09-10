@@ -1,3 +1,11 @@
+// Immediate-mode UI layer, imgui-style: every widget call (button/
+// textField/slider/...) both draws itself into the current frame's
+// instance list AND returns whether it was interacted with this frame.
+// Call beginFrame() once per frame before any widgets, endFrame() after,
+// then hand the accumulated instances to Renderer::render(). Widgets take
+// a `const char* id` for hover/press/focus tracking, ids must be unique
+// per frame or two widgets will fight over hover/focus state, string
+// literals are fine since they're compared by content not pointer.
 #pragma once
 
 #include "bang/render/Renderer.hpp"

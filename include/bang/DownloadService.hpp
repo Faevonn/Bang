@@ -1,3 +1,12 @@
+// Background download queue backed by a single worker thread. enqueue()
+// just records a job and wakes the worker, runJob() does the real work:
+// shell out to yt-dlp/spotdl, parse progress off stdout, import whatever
+// audio comes out, then delete the temp job directory.
+// NOTE: if a single URL is a playlist and produces multiple tracks, only
+// the FIRST imported track's id gets linked to the downloads row
+// (completeDownload only takes one trackId). The rest still land in the
+// library, they just won't show up tied to this specific download in
+// LibraryCatalog::recentDownloads.
 #pragma once
 
 #include "bang/LibraryStore.hpp"

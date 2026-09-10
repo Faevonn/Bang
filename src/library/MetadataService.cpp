@@ -9,6 +9,10 @@
 
 #include <stdexcept>
 
+// read()/write() assume ID3v2 (falls back to whatever tag() gives on read
+// if there's no ID3v2 frame). embedArtwork() always replaces the existing
+// APIC frame rather than appending, so re-importing a file with new artwork
+// just works instead of piling up duplicate cover images.
 namespace bang {
 
 namespace {

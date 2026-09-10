@@ -1,3 +1,6 @@
+// Plain data shapes for a library track and a track shown in a listing.
+// contentHash is the SHA-256 used to find the file on disk (see LibraryStore
+// trackFilePath), so it must stay in sync with whatever TrackImporter wrote.
 #pragma once
 
 #include <cstdint>

@@ -1,3 +1,7 @@
+// Read-only view over LibraryStore: joins tracks/favorites/playlists into
+// the shapes the UI actually wants (TrackListing, DownloadRow) instead of
+// making main.cpp deal with raw sqlite rows. Add new list/filter views here,
+// not in LibraryStore, keep LibraryStore itself to plain CRUD.
 #pragma once
 
 #include "bang/Track.hpp"

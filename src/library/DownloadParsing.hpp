@@ -1,3 +1,7 @@
+// Parses the stdout markers yt-dlp/spotdl emit while running (see the
+// --progress-template/--print args built in DownloadParsing.cpp). If yt-dlp
+// changes its template syntax in a future version, this is the first place
+// to check when downloads silently stop reporting progress.
 #pragma once
 
 #include <cstdint>

@@ -9,6 +9,12 @@
 #include <stdexcept>
 #include <system_error>
 
+// importFile() is the single entry point every acquisition path funnels
+// through (manual add, download completion, M3U import). .mod files are
+// detected purely by extension and skip MetadataService entirely (no ID3
+// tags exist for tracker formats), everything else is treated as MP3.
+// On any failure after the file copy, the partially-copied file is removed
+// so we don't leave orphaned files with no DB row.
 namespace bang {
 
 namespace {

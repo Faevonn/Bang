@@ -19,6 +19,10 @@ using bang::sql::columnText;
 using bang::sql::expectDone;
 using bang::sql::expectRow;
 
+// Schema version is tracked in SQLite's own `PRAGMA user_version`, checked
+// once at startup in applyMigrations(). Currently at 2: version 1 was the
+// original 5 tables, version 2 added tracks.stored_extension (for .mod
+// support). Next migration should follow the same `if (version < 3)` shape.
 namespace bang {
 
 namespace {

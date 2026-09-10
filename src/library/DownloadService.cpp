@@ -7,6 +7,11 @@
 #include <algorithm>
 #include <chrono>
 
+// 1 hour timeout below is generous on purpose, large playlists through
+// yt-dlp can genuinely take a while. spotdl progress is much rougher than
+// yt-dlp's: it has no machine-readable progress output, so runJob() just
+// bumps progressPercent by 25 each time it sees a "Downloaded" line in
+// spotdl's stdout, capped at 95 until the process actually exits.
 namespace bang {
 
 namespace {

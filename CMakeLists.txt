@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.25)
 
+# Full dependency list is in README.md, keep both in sync if this changes.
+# jetbrains_mono FetchContent below needs network access at configure time
+# (or a pre-populated FETCHCONTENT_SOURCE_DIR_JETBRAINS_MONO), remember
+# that if building somewhere offline/sandboxed.
 project(bang VERSION 0.1.0 LANGUAGES C CXX)
 
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)

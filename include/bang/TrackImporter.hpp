@@ -1,3 +1,8 @@
+// Content-addressed import: hashes the source file (SHA-256), copies it
+// into the library under tracks/<hash>.<ext> if that hash isn't already
+// stored, tags it (skipped for .mod files, see MetadataService), and
+// inserts/updates the DB row. Safe to call twice with the same file, the
+// second call is a no-op copy (isNew == false) but still returns the track.
 #pragma once
 
 #include "bang/LibraryStore.hpp"

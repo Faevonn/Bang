@@ -1,3 +1,11 @@
+// Thin wrapper around GStreamer's playbin element, playbin handles
+// demux/decode/output selection on its own so this class barely needs to
+// know about GStreamer internals beyond state changes and bus messages.
+// IMPORTANT: poll() has to be called regularly from the main loop (see
+// main.cpp's frame loop). It's what drains the GStreamer bus for EOS/error/
+// state-changed messages. If nothing calls poll(), end-of-track never
+// fires onFinished_ and playback just silently sits there after the file
+// ends. gst_init_check is only run once process-wide (the static bool).
 #pragma once
 
 #include <filesystem>

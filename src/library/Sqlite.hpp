@@ -6,6 +6,11 @@
 #include <string>
 #include <string_view>
 
+// Tiny RAII/helper layer over raw sqlite3 C API, just enough to avoid
+// repeating prepare/step/finalize boilerplate everywhere. Not a general
+// purpose ORM, deliberately thin. Statement always throws on prepare
+// failure, expectRow/expectDone throw on the wrong step result, callers
+// don't need to check return codes themselves.
 namespace bang::sql {
 
 class Statement {

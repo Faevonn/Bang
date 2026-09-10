@@ -7,6 +7,9 @@
 #include <stdexcept>
 #include <utility>
 
+// Just shells out to `yt-dlp ytsearchN:query` and parses the tab-separated
+// result lines, see download::ytDlpSearchArguments/parseSearchOutput for
+// the actual argument building and parsing.
 namespace bang {
 
 namespace {

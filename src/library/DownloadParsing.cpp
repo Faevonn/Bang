@@ -3,6 +3,12 @@
 #include <cstdlib>
 #include <sstream>
 
+// classifyLine() reads the BANGPCT|/BANGDONE| lines that ytDlpArguments()
+// asks yt-dlp to print. The done-item parsing assumes exactly 4 pipe-joined
+// fields (path|title|uploader|duration) with the title allowed to contain
+// its own pipes, hence the loop that reassembles it. If yt-dlp's output
+// format ever changes, this is brittle and needs matching updates on both
+// sides (the --print template here and the split logic).
 namespace bang::download {
 
 namespace {

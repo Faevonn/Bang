@@ -1,3 +1,13 @@
+// Owns the SQLite handle and does all reads/writes to library.sqlite3.
+// Schema lives in applyMigrations() in the .cpp, bump schemaVersion there
+// and add an `if (version < N)` block when changing the schema, don't edit
+// old migration steps in place.
+// removeTrack() only deletes the DB row and hands back the content hash, it
+// does NOT delete the on-disk audio/artwork files. The "Del" button in
+// main.cpp's library panel (App::confirmDeleteTrack) is the one caller that
+// does both, follow that pattern (removeTrack then
+// TrackImporter::deleteStoredFiles) for any other place that deletes a
+// track.
 #pragma once
 
 #include "bang/Playlist.hpp"

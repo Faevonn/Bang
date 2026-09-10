@@ -2,6 +2,8 @@
 
 #include <cstdlib>
 
+// Falls back to cwd if HOME isn't set, which only really happens in odd
+// sandboxed environments. Good enough for now, not worth overengineering.
 namespace bang {
 
 namespace {

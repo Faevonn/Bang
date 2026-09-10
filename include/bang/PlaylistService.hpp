@@ -1,3 +1,8 @@
+// M3U/M3U8 import and export. importM3u only pulls in local files, remote
+// URLs listed in a playlist are silently skipped (use the download flow for
+// those instead). Imported files are deduped by content hash the same way
+// TrackImporter dedupes everywhere else, so importing the same playlist
+// twice adds zero duplicate tracks, just re-links existing ones.
 #pragma once
 
 #include "bang/LibraryStore.hpp"

@@ -10,6 +10,10 @@
 #include <cmath>
 #include <stdexcept>
 
+// FontSlot bundles the parallel FreeType face and HarfBuzz font/face/blob
+// objects that both point at the same embedded font bytes. loadedPixelSize
+// tracks which size FT_Set_Pixel_Sizes was last called with, to skip
+// redundant resizes, see wherever this gets checked before rasterizing.
 namespace bang::text {
 
 struct TextEngine::FontSlot {

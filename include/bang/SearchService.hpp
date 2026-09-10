@@ -1,3 +1,7 @@
+// YouTube search via `yt-dlp --flat-playlist ytsearchN:query`, parsed out
+// of tab-separated stdout in DownloadParsing.cpp. This is a blocking call
+// (up to 60s timeout), main.cpp runs it on a worker thread, see the search
+// dialog code.
 #pragma once
 
 #include <cstddef>

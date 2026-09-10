@@ -1,3 +1,5 @@
+// Just the playlist row itself. Track order/membership lives in the
+// playlist_tracks join table, not here (see LibraryStore).
 #pragma once
 
 #include <cstdint>

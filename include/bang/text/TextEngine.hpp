@@ -1,3 +1,10 @@
+// FreeType + HarfBuzz text shaping over two embedded JetBrains Mono faces
+// (regular/bold, baked into the binary at build time, see
+// cmake/embed_binary.cmake and the FetchContent block in CMakeLists.txt).
+// shape() does HarfBuzz layout only (returns glyph indices and positions),
+// rasterize() does the actual FreeType bitmap render on demand. Ui.cpp is
+// what caches rasterized glyphs into the atlas, this class itself has no
+// cache, every rasterize() call re-renders.
 #pragma once
 
 #include <cstddef>

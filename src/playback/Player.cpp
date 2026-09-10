@@ -4,6 +4,9 @@
 
 #include <stdexcept>
 
+// fileUri() is a minimal percent-encoder, only escapes characters that
+// actually break a file:// URI (space, quote, #, %, ?, &). Not a general
+// RFC 3986 encoder, don't reuse it for anything but local file paths.
 namespace bang {
 
 namespace {

@@ -13,6 +13,12 @@
 #include <stdexcept>
 #include <utility>
 
+// Raw POSIX fork/pipe/poll/waitpid, no popen(). execute() is the one real
+// function here: forks, redirects stdout/stderr to pipes, polls both with a
+// 250ms tick so the overall timeout can be enforced, and on timeout sends
+// SIGTERM then SIGKILL if the child doesn't die within 2s. If this needs
+// debugging, the child side (pid == 0 branch) only has _exit, never a
+// normal return, that's deliberate so we don't run C++ destructors twice.
 namespace bang {
 
 namespace {

@@ -14,6 +14,10 @@
 using bang::sql::Statement;
 using bang::sql::columnText;
 
+// isUrl() is what decides "skip this M3U entry" vs "import it", anything
+// with a scheme:// prefix is treated as remote and ignored. If we ever want
+// M3U entries to trigger an actual download instead of being skipped,
+// that logic goes here, not in DownloadService.
 namespace bang {
 
 namespace {

@@ -1,3 +1,10 @@
+// Vulkan renderer: one instanced-quad pipeline plus a shared glyph atlas
+// texture. Ui.cpp builds a flat list of Instance structs each frame (one
+// per rect/glyph/etc) and hands them to render(), which does the actual
+// draw call. allocateAtlas/uploadAtlas are how TextEngine-rasterized
+// glyphs get uploaded into the shared texture that all text draws sample
+// from. No public swapchain-recreate call, resize() just marks it dirty
+// and the next render() call recreates it lazily.
 #pragma once
 
 #include <cstddef>

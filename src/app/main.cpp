@@ -24,6 +24,18 @@
 #include <thread>
 #include <vector>
 
+// Wires everything together and IS the UI: App holds all app-level state
+// (current tab, filter text, open dialogs, etc), the draw*() free functions
+// each render one screen region by calling into ui::Ui, and main() runs the
+// frame loop. There's no separate "screen" abstraction, it's all just
+// functions reading/mutating App each frame, imgui style, same as Ui.cpp.
+// Frame loop pattern to remember: window.poll() pumps Wayland events,
+// player.poll() drains the GStreamer bus (both need calling every frame or
+// their respective subsystems stall), libraryDirty is an atomic<bool> set
+// by DownloadService's listener callback (runs on the download worker
+// thread) and consumed here on the main thread to trigger app.refresh().
+// Volume is persisted via LibraryStore's generic settings table (0-100
+// on disk, 0.0-1.0 in memory), loaded once at startup.
 namespace {
 
 std::string formatDuration(std::int64_t ms)
@@ -41,6 +53,18 @@ std::string formatDuration(std::int64_t ms)
 
 enum class Tab { Library = 0, Playlists = 1, Favorites = 2, Downloads = 3 };
 
+// Central per-frame app state, one instance lives for the whole run. Search
+// runs on its own detached-ish thread (searchThread, joined in ~App or the
+// next startSearch()/pollSearch() call), pollSearch() must be called every
+// frame while searchBusy is true or results never get picked up, see
+// drawDialogs for where that happens. refresh() re-runs whatever query
+// matches the current tab/filter/playlist and should be called after any
+// mutation (add/remove/favorite/playlist edit), it's not automatic.
+// Deleting a track goes through requestDeleteTrack() (sets
+// pendingDeleteTrack + opens the confirm dialog) then confirmDeleteTrack()
+// on confirm, which stops playback first if the deleted track is the one
+// currently loaded, then calls store.removeTrack() followed by
+// TrackImporter::deleteStoredFiles() to actually remove the file on disk.
 struct App {
     bang::LibraryStore& store;
     bang::LibraryCatalog& catalog;
@@ -132,6 +156,34 @@ struct App {
     double volume = 0.8;
     bool seekDragging = false;
 
+    std::optional<bang::Track> pendingDeleteTrack;
+    bool deleteDialogOpen = false;
+
+    void requestDeleteTrack(const bang::Track& track)
+    {
+        pendingDeleteTrack = track;
+        deleteDialogOpen = true;
+    }
+
+    void confirmDeleteTrack()
+    {
+        if (!pendingDeleteTrack.has_value()) {
+            deleteDialogOpen = false;
+            return;
+        }
+        const auto trackId = pendingDeleteTrack->id;
+        if (currentTrack.has_value() && currentTrack->id == trackId) {
+            player.stop();
+            currentTrack.reset();
+        }
+        if (const auto hash = store.removeTrack(trackId); hash.has_value()) {
+            bang::TrackImporter::deleteStoredFiles(store, *hash);
+        }
+        pendingDeleteTrack.reset();
+        deleteDialogOpen = false;
+        refresh();
+    }
+
     void refresh()
     {
         listing = filter.empty()
@@ -183,6 +235,9 @@ struct App {
 
     void enqueueUrl(const std::string& url, bool spotdl)
     {
+        // Auto-detect Spotify links/URIs and force the spotdl backend even
+        // if the URL dialog's backend toggle wasn't flipped, so pasting a
+        // Spotify link always does the right thing by default.
         if (url.find("open.spotify.com") != std::string::npos
             || url.find("spotify:") != std::string::npos) {
             spotdl = true;
@@ -239,6 +294,11 @@ void drawTopBar(bang::ui::Ui& ui, App& app, float width)
     }
 }
 
+// Returns true if the caller (main()) needs to call app.refresh() after
+// this, e.g. a favorite got toggled or a track got queued for playback via
+// a filter change. Panels that don't mutate library state (playlists,
+// downloads) don't need this return-and-refresh dance, see their void
+// signatures below.
 bool drawLibraryPanel(bang::ui::Ui& ui, App& app, float x, float y, float w,
     float h)
 {
@@ -318,6 +378,12 @@ bool drawLibraryPanel(bang::ui::Ui& ui, App& app, float x, float y, float w,
         if (hoverStar) {
             app.store.setFavorite(entry.track.id, !entry.favorite);
             needsRefresh = true;
+        }
+
+        const std::string deleteId = "del" + std::to_string(entry.track.id);
+        if (ui.button(deleteId.c_str(), "Del", x + w - 62.0f, rowY + 7.0f,
+                44.0f, 24.0f)) {
+            app.requestDeleteTrack(entry.track);
         }
     }
     return needsRefresh;
@@ -665,6 +731,33 @@ void drawDialogs(bang::ui::Ui& ui, App& app, float width, float height)
             app.playlistDialogOpen = false;
         }
     }
+
+    if (app.deleteDialogOpen && app.pendingDeleteTrack.has_value()) {
+        dimOverlay();
+        const float dw = 420.0f;
+        const float dh = 150.0f;
+        const float dx = (width - dw) * 0.5f;
+        const float dy = (height - dh) * 0.5f;
+        dialogFrame(dw, dh);
+        ui.text("Delete track", dx + 24.0f, dy + 22.0f, 17.0f,
+            bang::text::Weight::Bold, bang::ui::palette::text);
+        ui.textTruncated(
+            "Remove \"" + app.pendingDeleteTrack->title
+                + "\" from the library? This deletes the stored audio file"
+                  " and cannot be undone.",
+            dx + 24.0f, dy + 54.0f, dw - 48.0f, 13.0f,
+            bang::text::Weight::Regular, bang::ui::palette::textDim);
+
+        if (ui.button("confirmDelete", "Delete", dx + dw - 122.0f,
+                dy + dh - 48.0f, 98.0f, 32.0f, true)) {
+            app.confirmDeleteTrack();
+        }
+        if (ui.button("cancelDelete", "Cancel", dx + 24.0f, dy + dh - 48.0f,
+                90.0f, 32.0f)) {
+            app.pendingDeleteTrack.reset();
+            app.deleteDialogOpen = false;
+        }
+    }
 }
 
 } // namespace
@@ -721,6 +814,11 @@ int main()
 
             if (keyboard.escape && app.urlDialogOpen) {
                 app.urlDialogOpen = false;
+                keyboard.escape = false;
+            }
+            if (keyboard.escape && app.deleteDialogOpen) {
+                app.pendingDeleteTrack.reset();
+                app.deleteDialogOpen = false;
                 keyboard.escape = false;
             }
 

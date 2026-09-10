@@ -20,6 +20,14 @@
 #include <string>
 #include <vector>
 
+// State (the pimpl struct) holds every raw Wayland/xkbcommon object plus
+// all the listener callbacks (registryHandle, seatCapabilities,
+// keyboardKey, pointerMotion, etc). Registry binding happens in
+// registryHandle: compositor, xdg_wm_base, wl_seat, and the clipboard data
+// device manager are all picked up there as the compositor announces them,
+// so if a global goes missing at runtime, that's the first place to check.
+// Keymap handling uses xkbcommon (keyboardKeymap/keyboardKey), not raw
+// wl_keyboard keycodes, so layout switching works for free.
 namespace bang::platform {
 
 struct Window::State {

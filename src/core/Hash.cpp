@@ -6,6 +6,9 @@
 #include <fstream>
 #include <stdexcept>
 
+// Standard FIPS 180-4 SHA-256. If this ever needs touching, diff against
+// the NIST test vectors in tests/hash_smoke_test.cpp first, that test
+// exists specifically to catch a broken edit here.
 namespace bang {
 
 namespace {

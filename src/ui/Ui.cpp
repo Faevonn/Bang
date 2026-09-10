@@ -5,6 +5,10 @@
 #include <chrono>
 #include <cmath>
 
+// glyphKey() packs weight/size/glyph-index into one uint64 for the atlas
+// cache map (glyphCache_ in Ui.hpp). If pixel sizes ever need to exceed 16
+// bits or glyph indices need more than 32 bits, this packing breaks
+// silently, watch for it if font rendering ever goes weird at large sizes.
 namespace bang::ui {
 
 namespace {

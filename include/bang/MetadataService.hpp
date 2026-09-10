@@ -1,3 +1,8 @@
+// TagLib wrapper for reading/writing ID3v2 tags and cover art. Only speaks
+// MPEG/.mp3 (TagLib::MPEG::File), on purpose: .mod tracker files are never
+// passed through here, see TrackImporter which skips tagging entirely for
+// those. If MP4/FLAC/etc support is ever needed, this needs a real
+// TagLib::FileRef dispatch instead of hardcoding MPEG::File.
 #pragma once
 
 #include <cstdint>

@@ -11,6 +11,9 @@
 using bang::sql::Statement;
 using bang::sql::columnText;
 
+// Every query in this file re-derives the same "listing" columns via
+// listingColumns below, keep that string and readListing() in sync with
+// LibraryStore's own trackColumns if the tracks table schema changes.
 namespace bang {
 
 namespace {

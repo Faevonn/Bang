@@ -1,3 +1,9 @@
+// Wayland xdg-shell window: owns the wl_display connection, surface, seat
+// input (pointer + keyboard), and clipboard paste support. Exposes just
+// enough surface area for Renderer (display()/surface()) and Ui
+// (takePointer()/takeKeyboard(), consumed once per frame then reset).
+// poll() pumps the Wayland event queue, call it once per frame like
+// Player::poll(), same pattern.
 #pragma once
 
 #include "bang/ui/Ui.hpp"

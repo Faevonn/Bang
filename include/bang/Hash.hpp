@@ -1,3 +1,6 @@
+// Hand-rolled SHA-256, used for content-addressing imported audio files
+// (the hex digest becomes the filename under tracks/). No external crypto
+// lib dependency for this, on purpose, since it's the only place we need it.
 #pragma once
 
 #include <cstddef>
