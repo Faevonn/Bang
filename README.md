@@ -1,7 +1,7 @@
 # Bang
 
-Bang is a native C++23 music application for Wayland. It acquires music —
-paste a YouTube or Spotify link, or search YouTube from inside the app —
+Bang is a native C++23 music application for Wayland. It acquires music -
+paste a YouTube or Spotify link, or search YouTube from inside the app -
 stores normal audio as `.mp3` files with embedded tags and cover art, while preserving tracker `.mod` files, and plays
 it back from an indexed local library with playlists and favorites.
 
