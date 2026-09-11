@@ -15,3 +15,35 @@ target_link_libraries(bang-download-service-test PRIVATE bang::core)
 bang_enable_sanitizers(bang-download-service-test)
 add_test(NAME bang-download-service-test COMMAND bang-download-service-test)
 set_tests_properties(bang-download-service-test PROPERTIES TIMEOUT 20)
+
+add_executable(bang-playlist-order-test playlist_order_test.cpp)
+target_link_libraries(bang-playlist-order-test PRIVATE bang::core)
+bang_enable_sanitizers(bang-playlist-order-test)
+add_test(NAME bang-playlist-order-test COMMAND bang-playlist-order-test)
+set_tests_properties(bang-playlist-order-test PROPERTIES TIMEOUT 10)
+
+add_executable(bang-library-migration-test library_migration_test.cpp)
+target_link_libraries(bang-library-migration-test PRIVATE bang::core)
+bang_enable_sanitizers(bang-library-migration-test)
+add_test(NAME bang-library-migration-test COMMAND bang-library-migration-test)
+set_tests_properties(bang-library-migration-test PROPERTIES TIMEOUT 10)
+
+add_executable(bang-track-import-test track_import_test.cpp)
+target_link_libraries(bang-track-import-test PRIVATE bang::core)
+bang_enable_sanitizers(bang-track-import-test)
+add_test(NAME bang-track-import-test COMMAND bang-track-import-test)
+set_tests_properties(bang-track-import-test PROPERTIES TIMEOUT 20)
+
+add_executable(bang-track-deletion-test track_deletion_test.cpp)
+target_link_libraries(bang-track-deletion-test PRIVATE bang::core)
+bang_enable_sanitizers(bang-track-deletion-test)
+add_test(NAME bang-track-deletion-test COMMAND bang-track-deletion-test)
+set_tests_properties(bang-track-deletion-test PROPERTIES TIMEOUT 10)
+
+add_test(NAME bang-build-parallelism-test
+    COMMAND sh "${CMAKE_CURRENT_SOURCE_DIR}/build_parallelism_test.sh" "${PROJECT_SOURCE_DIR}")
+set_tests_properties(bang-build-parallelism-test PROPERTIES TIMEOUT 20)
+
+add_test(NAME bang-build-test-preset-test
+    COMMAND sh "${CMAKE_CURRENT_SOURCE_DIR}/build_test_preset_test.sh" "${PROJECT_SOURCE_DIR}")
+set_tests_properties(bang-build-test-preset-test PROPERTIES TIMEOUT 20)
