@@ -435,64 +435,136 @@ void drawPlaylistsPanel(bang::ui::Ui& ui, App& app, float x, float y, float w,
     }
 }
 
+std::vector<std::string> downloadMessageLines(
+    bang::ui::Ui& ui, const std::string& message, float width)
+{
+    std::vector<std::string> lines;
+    std::string line;
+    for (std::size_t index = 0; index < message.size();) {
+        if (message[index] == '\n' || message[index] == '\r') {
+            if (!line.empty()) {
+                lines.push_back(std::move(line));
+                line.clear();
+            }
+            ++index;
+            continue;
+        }
+        std::size_t end = index + 1;
+        while (end < message.size() && (message[end] & 0xC0) == 0x80) {
+            ++end;
+        }
+        const std::string character = message.substr(index, end - index);
+        if (!line.empty() && ui.textWidth(line + character, 12.0f,
+                bang::text::Weight::Regular) > width) {
+            const auto space = line.find_last_of(' ');
+            if (space != std::string::npos && space > 0) {
+                lines.push_back(line.substr(0, space));
+                line.erase(0, space + 1);
+            } else {
+                lines.push_back(std::move(line));
+                line.clear();
+            }
+        }
+        line += character;
+        index = end;
+    }
+    if (!line.empty()) {
+        lines.push_back(std::move(line));
+    }
+    return lines;
+}
+
 void drawDownloadsPanel(bang::ui::Ui& ui, App& app, float x, float y, float w,
     float h)
 {
     const auto jobs = app.downloads.snapshot();
-    const float rowHeight = 40.0f;
-    float cy = y + 12.0f;
-
+    const auto history = app.catalog.recentDownloads(50);
+    // Everforest Hard Dark error foreground and surface.
+    constexpr bang::ui::Color errorText { 230.0f / 255, 126.0f / 255, 128.0f / 255, 1 };
+    constexpr bang::ui::Color errorSurface { 39.0f / 255, 46.0f / 255, 51.0f / 255, 1 };
+    constexpr float messageLineHeight = 18.0f;
+    std::vector<std::vector<std::string>> jobMessages;
+    std::vector<std::vector<std::string>> historyMessages;
+    float contentHeight = 74.0f;
+    for (const auto& job : jobs) {
+        jobMessages.push_back(downloadMessageLines(ui,
+            job.state == bang::DownloadService::State::Failed ? job.message : "",
+            std::max(1.0f, w - 48.0f)));
+        contentHeight += 40.0f + messageLineHeight * jobMessages.back().size();
+    }
+    for (const auto& record : history) {
+        historyMessages.push_back(downloadMessageLines(ui,
+            record.status == "failed" ? record.message : "", std::max(1.0f, w - 48.0f)));
+        contentHeight += 22.0f + messageLineHeight * historyMessages.back().size();
+    }
+    app.downloadsScroll = std::clamp(app.downloadsScroll, 0.0f,
+        std::max(0.0f, contentHeight - h));
+    static_cast<void>(ui.scrolled(x, y, w, h, contentHeight, app.downloadsScroll));
+    const auto visibleLine = [&](float top) { return top >= y && top + 18.0f <= y + h; };
+    const auto drawMessage = [&](const std::vector<std::string>& lines, float top) {
+        for (const auto& line : lines) {
+            if (visibleLine(top)) {
+                ui.text(line, x + 24.0f, top, 12.0f, bang::text::Weight::Regular, errorText);
+            }
+            top += messageLineHeight;
+        }
+    };
+    float cy = y + 12.0f - app.downloadsScroll;
     for (std::size_t index = 0; index < jobs.size(); ++index) {
         const auto& job = jobs[index];
-        ui.fillRect(x + 12.0f, cy, w - 24.0f, rowHeight - 6.0f,
-            bang::ui::palette::surfaceRaised, 6.0f);
-        const std::string label = job.label.size() > 70
-            ? job.label.substr(0, 70) + "…"
-            : job.label;
-        ui.textTruncated(label, x + 24.0f, cy + 12.0f, w - 340.0f, 13.0f,
-            bang::text::Weight::Regular, bang::ui::palette::text);
-        switch (job.state) {
-        case bang::DownloadService::State::Running:
-            ui.progressBar(job.progressPercent / 100.0f, x + w - 300.0f,
-                cy + 15.0f, 180.0f, 8.0f);
-            break;
-        case bang::DownloadService::State::Completed:
-            ui.text("done", x + w - 290.0f, cy + 12.0f, 13.0f,
-                bang::text::Weight::Bold, bang::ui::palette::accent);
-            break;
-        case bang::DownloadService::State::Failed:
-            ui.text("failed", x + w - 300.0f, cy + 12.0f, 13.0f,
-                bang::text::Weight::Bold,
-                bang::ui::Color { 0.95f, 0.35f, 0.35f, 1.0f });
-            break;
-        default:
-            ui.text("queued", x + w - 290.0f, cy + 12.0f, 13.0f,
-                bang::text::Weight::Regular, bang::ui::palette::textDim);
-            break;
+        const float rowHeight = 40.0f + messageLineHeight * jobMessages[index].size();
+        const float top = std::max(y, cy);
+        const float bottom = std::min(y + h, cy + rowHeight - 6.0f);
+        if (bottom > top) {
+            ui.fillRect(x + 12.0f, top, w - 24.0f, bottom - top,
+                job.state == bang::DownloadService::State::Failed
+                    ? errorSurface : bang::ui::palette::surfaceRaised, 6.0f);
         }
+        if (visibleLine(cy + 12.0f)) {
+            ui.textTruncated(job.label, x + 24.0f, cy + 12.0f,
+                std::max(1.0f, w - 244.0f), 13.0f,
+                bang::text::Weight::Regular, bang::ui::palette::text);
+            switch (job.state) {
+            case bang::DownloadService::State::Running:
+                ui.progressBar(job.progressPercent / 100.0f, x + w - 200.0f,
+                    cy + 15.0f, 176.0f, 8.0f);
+                break;
+            case bang::DownloadService::State::Completed:
+                ui.text("done", x + w - 100.0f, cy + 12.0f, 13.0f,
+                    bang::text::Weight::Bold, bang::ui::palette::accent);
+                break;
+            case bang::DownloadService::State::Failed:
+                ui.text("failed", x + w - 100.0f, cy + 12.0f, 13.0f,
+                    bang::text::Weight::Bold, errorText);
+                break;
+            default:
+                ui.text("queued", x + w - 100.0f, cy + 12.0f, 13.0f,
+                    bang::text::Weight::Regular, bang::ui::palette::textDim);
+                break;
+            }
+        }
+        drawMessage(jobMessages[index], cy + 32.0f);
         cy += rowHeight;
     }
 
-        cy += 8.0f;
-
-    const float historyTop = cy + 12.0f;
-    if (historyTop > y + h) {
-        return;
+    const float historyTop = cy + 20.0f;
+    if (visibleLine(historyTop)) {
+        ui.text("History", x + 16.0f, historyTop, 15.0f, bang::text::Weight::Bold,
+            bang::ui::palette::textDim);
     }
-    ui.text("History", x + 16.0f, historyTop, 15.0f, bang::text::Weight::Bold,
-        bang::ui::palette::textDim);
     float hy = historyTop + 30.0f;
-    for (const auto& record : app.catalog.recentDownloads(50)) {
-        if (hy > y + h - 24.0f) {
-            break;
+    for (std::size_t index = 0; index < history.size(); ++index) {
+        const auto& record = history[index];
+        if (visibleLine(hy)) {
+            ui.textTruncated(record.requestUrl, x + 16.0f, hy, std::max(1.0f, w - 200.0f),
+                12.0f, bang::text::Weight::Regular, bang::ui::palette::textDim);
+            ui.text(record.status, x + w - 160.0f, hy, 12.0f,
+                bang::text::Weight::Bold,
+                record.status == "completed" ? bang::ui::palette::accent
+                    : record.status == "failed" ? errorText : bang::ui::palette::textFaint);
         }
-        ui.textTruncated(record.requestUrl, x + 16.0f, hy, w - 200.0f, 12.0f,
-            bang::text::Weight::Regular, bang::ui::palette::textDim);
-        ui.text(record.status, x + w - 160.0f, hy, 12.0f,
-            bang::text::Weight::Bold,
-            record.status == "completed" ? bang::ui::palette::accent
-                                         : bang::ui::palette::textFaint);
-        hy += 22.0f;
+        drawMessage(historyMessages[index], hy + 18.0f);
+        hy += 22.0f + messageLineHeight * historyMessages[index].size();
     }
 }
 
