@@ -1,0 +1,36 @@
+name: Build and test
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: ${{ matrix.preset }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [debug, sanitizer]
+    env:
+      CMAKE_BUILD_PARALLEL_LEVEL: 2
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install build and test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            build-essential cmake pkg-config \
+            libvulkan-dev glslc libwayland-dev wayland-protocols \
+            libsqlite3-dev libtag1-dev libgstreamer1.0-dev \
+            libfreetype-dev libharfbuzz-dev libxkbcommon-dev ffmpeg
+      - name: Configure, build, and test
+        run: cmake --workflow --preset "${{ matrix.preset }}"
