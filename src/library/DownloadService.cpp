@@ -240,36 +240,47 @@ void DownloadService::runJob(Job& job)
 
     std::vector<Track> importedTracks;
     std::string failureMessage;
+    const auto diagnosticOutput = [&] {
+        std::string message = trimToLimit(result.errorOutput);
+        if (message.empty()) {
+            message = trimToLimit(result.standardOutput);
+        }
+        return message;
+    };
 
     if (!result.succeeded()) {
         failureMessage = result.timedOut
             ? "download timed out"
-            : trimToLimit(result.errorOutput);
-    } else {
-        std::vector<std::filesystem::path> sources;
-        if (backend == Backend::YtDlp && !doneItems.empty()) {
-            for (const auto& item : doneItems) {
-                sources.push_back(item.filePath);
-            }
-        } else {
-            sources = collectAudioFiles(workDirectory);
+            : diagnosticOutput();
+        if (failureMessage.empty()) {
+            failureMessage = std::string(backendName(backend))
+                + " exited with status " + std::to_string(result.exitCode);
         }
+    }
 
-        const std::string sourceTag = backend == Backend::YtDlp ? "youtube" : "spotify";
-        for (std::size_t index = 0; index < sources.size(); ++index) {
-            AudioMetadata overrides;
-            if (backend == Backend::YtDlp && index < doneItems.size()) {
-                overrides.title = doneItems[index].title;
-                overrides.artist = doneItems[index].uploader;
-            }
-            try {
-                const TrackImporter::Result imported =
-                    importer_->importFile(sources[index], overrides,
-                        sourceTag, url);
-                importedTracks.push_back(imported.track);
-            } catch (const std::exception& error) {
+    std::vector<std::filesystem::path> sources;
+    if (backend == Backend::YtDlp && !doneItems.empty()) {
+        for (const auto& item : doneItems) {
+            sources.push_back(item.filePath);
+        }
+    } else if (result.succeeded() || (backend == Backend::SpotDl && !result.timedOut)) {
+        sources = collectAudioFiles(workDirectory);
+    }
+
+    const std::string sourceTag = backend == Backend::YtDlp ? "youtube" : "spotify";
+    for (std::size_t index = 0; index < sources.size(); ++index) {
+        AudioMetadata overrides;
+        if (backend == Backend::YtDlp && index < doneItems.size()) {
+            overrides.title = doneItems[index].title;
+            overrides.artist = doneItems[index].uploader;
+        }
+        try {
+            const TrackImporter::Result imported =
+                importer_->importFile(sources[index], overrides, sourceTag, url);
+            importedTracks.push_back(imported.track);
+        } catch (const std::exception& error) {
+            if (failureMessage.empty()) {
                 failureMessage = error.what();
-                break;
             }
         }
     }
@@ -277,14 +288,24 @@ void DownloadService::runJob(Job& job)
     std::error_code cleanupError;
     std::filesystem::remove_all(workDirectory, cleanupError);
 
+    if (importedTracks.empty() && failureMessage.empty()) {
+        failureMessage = diagnosticOutput();
+    }
+
     {
         std::lock_guard lock(mutex_);
-        if (importedTracks.empty()) {
+        if (importedTracks.empty() || !failureMessage.empty()) {
             job.state = State::Failed;
             job.message = failureMessage.empty() ? "no audio produced"
                                                  : failureMessage;
+            if (!importedTracks.empty()) {
+                job.message = std::to_string(importedTracks.size())
+                    + (importedTracks.size() == 1 ? " track imported; " : " tracks imported; ")
+                    + job.message;
+            }
             store_->completeDownload(job.recordId,
-                DownloadStatus::Failed, job.message, std::nullopt);
+                DownloadStatus::Failed, job.message, importedTracks.empty()
+                    ? std::nullopt : std::optional(importedTracks.front().id));
         } else {
             job.state = State::Completed;
             job.progressPercent = 100.0;
