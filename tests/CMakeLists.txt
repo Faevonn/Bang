@@ -39,3 +39,7 @@ target_link_libraries(bang-track-deletion-test PRIVATE bang::core)
 bang_enable_sanitizers(bang-track-deletion-test)
 add_test(NAME bang-track-deletion-test COMMAND bang-track-deletion-test)
 set_tests_properties(bang-track-deletion-test PROPERTIES TIMEOUT 10)
+
+add_test(NAME bang-build-parallelism-test
+    COMMAND sh "${CMAKE_CURRENT_SOURCE_DIR}/build_parallelism_test.sh" "${PROJECT_SOURCE_DIR}")
+set_tests_properties(bang-build-parallelism-test PROPERTIES TIMEOUT 20)

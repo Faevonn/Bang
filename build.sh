@@ -5,14 +5,17 @@ set -eu
 repo_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 cd -- "$repo_dir"
 
-build_jobs=1
-if command -v nproc >/dev/null 2>&1; then
-    build_jobs="$(nproc)"
+if [ "${CMAKE_BUILD_PARALLEL_LEVEL+x}" != x ]; then
+    CMAKE_BUILD_PARALLEL_LEVEL=1
+    if command -v nproc >/dev/null 2>&1; then
+        CMAKE_BUILD_PARALLEL_LEVEL="$(nproc)"
+    fi
+    export CMAKE_BUILD_PARALLEL_LEVEL
 fi
 
 build() {
     cmake --preset "$1"
-    cmake --build --preset "$1" --parallel "$build_jobs"
+    cmake --build --preset "$1"
 }
 
 usage() {
