@@ -101,6 +101,17 @@ ProcessResult ProcessRunner::execute(const RunOptions& options, const LineSink& 
         throw std::runtime_error("pipe() failed for child process");
     }
 
+    for (int descriptor : { standardOutputPipe[0], errorOutputPipe[0] }) {
+        const int flags = ::fcntl(descriptor, F_GETFL);
+        if (flags < 0 || ::fcntl(descriptor, F_SETFL, flags | O_NONBLOCK) < 0) {
+            ::close(standardOutputPipe[0]);
+            ::close(standardOutputPipe[1]);
+            ::close(errorOutputPipe[0]);
+            ::close(errorOutputPipe[1]);
+            throw std::runtime_error("fcntl() failed for child process pipe");
+        }
+    }
+
     const pid_t pid = ::fork();
     if (pid < 0) {
         ::close(standardOutputPipe[0]);
@@ -167,12 +178,15 @@ ProcessResult ProcessRunner::execute(const RunOptions& options, const LineSink& 
                         newline = pendingStandardLine.find('\n');
                     }
                 }
-                continue;
+                // Return to poll after each chunk so neither stream can
+                // starve the other stream or the timeout check.
+                return false;
             }
             if (received < 0 && errno == EINTR) {
                 continue;
             }
-            break;
+            return received == 0
+                || (received < 0 && errno != EAGAIN && errno != EWOULDBLOCK);
         }
     };
 
@@ -203,18 +217,10 @@ ProcessResult ProcessRunner::execute(const RunOptions& options, const LineSink& 
                 continue;
             }
             if ((polled[index].revents & (POLLIN | POLLHUP)) != 0) {
-                const std::size_t before = index == 0
-                    ? result.standardOutput.size()
-                    : result.errorOutput.size();
-                if (index == 0) {
-                    drainDescriptor(readFds[0], result.standardOutput, true);
-                } else {
-                    drainDescriptor(readFds[1], result.errorOutput, false);
-                }
-                const std::size_t after = index == 0
-                    ? result.standardOutput.size()
-                    : result.errorOutput.size();
-                if (after == before) {
+                const bool closed = drainDescriptor(readFds[index],
+                    index == 0 ? result.standardOutput : result.errorOutput,
+                    index == 0);
+                if (closed) {
                     ::close(readFds[index]);
                     polled[index].fd = -1;
                     readFds[index] = -1;
@@ -241,7 +247,7 @@ ProcessResult ProcessRunner::execute(const RunOptions& options, const LineSink& 
             drainDescriptor(descriptor,
                 descriptor == standardOutputPipe[0] ? result.standardOutput
                                                     : result.errorOutput,
-                false);
+                descriptor == standardOutputPipe[0]);
             ::close(descriptor);
         }
     }
@@ -279,16 +285,16 @@ ProcessResult ProcessRunner::execute(const RunOptions& options, const LineSink& 
         }
     };
 
-    const auto expired = std::chrono::steady_clock::now() >= deadline;
-    if (expired) {
+    const auto remaining = std::max<std::int64_t>(0,
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            deadline - std::chrono::steady_clock::now()).count());
+    if (!waitForExit(static_cast<int>(remaining))) {
         result.timedOut = true;
         ::kill(pid, SIGTERM);
         if (!waitForExit(2000)) {
             ::kill(pid, SIGKILL);
             waitForExit(2000);
         }
-    } else {
-        waitForExit(static_cast<int>(options.timeout.count()));
     }
 
     return result;
