@@ -33,7 +33,7 @@ case "${1-}" in
         ;;
     test)
         build debug
-        exec ctest --test-dir "$repo_dir/build/debug" --output-on-failure
+        exec ctest --preset debug
         ;;
     run)
         build release
