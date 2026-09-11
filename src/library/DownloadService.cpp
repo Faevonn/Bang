@@ -240,11 +240,18 @@ void DownloadService::runJob(Job& job)
 
     std::vector<Track> importedTracks;
     std::string failureMessage;
+    const auto diagnosticOutput = [&] {
+        std::string message = trimToLimit(result.errorOutput);
+        if (message.empty()) {
+            message = trimToLimit(result.standardOutput);
+        }
+        return message;
+    };
 
     if (!result.succeeded()) {
         failureMessage = result.timedOut
             ? "download timed out"
-            : trimToLimit(result.errorOutput);
+            : diagnosticOutput();
         if (failureMessage.empty()) {
             failureMessage = std::string(backendName(backend))
                 + " exited with status " + std::to_string(result.exitCode);
@@ -280,6 +287,10 @@ void DownloadService::runJob(Job& job)
 
     std::error_code cleanupError;
     std::filesystem::remove_all(workDirectory, cleanupError);
+
+    if (importedTracks.empty() && failureMessage.empty()) {
+        failureMessage = diagnosticOutput();
+    }
 
     {
         std::lock_guard lock(mutex_);

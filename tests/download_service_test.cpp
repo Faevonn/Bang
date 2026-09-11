@@ -22,6 +22,10 @@ bool check(bool condition, const std::string& name)
 
 int runDownloader(const std::string& mode)
 {
+    if (mode.starts_with("spotify-")) {
+        std::cout << "AudioProviderError: no matching audio found\n";
+        return mode == "spotify-zero" ? 0 : 1;
+    }
     for (int index = 1; index <= 3; ++index) {
         const auto file = fs::current_path() / ("track" + std::to_string(index) + ".mp3");
         fs::copy_file(fs::path(std::getenv("BANG_TEST_FIXTURES")) / file.filename(), file);
@@ -58,7 +62,8 @@ bool runCase(const fs::path& root, const std::string& mode, std::size_t expected
             signal.notify_one();
         }
     });
-    downloads.enqueue({ mode, bang::DownloadService::Backend::YtDlp });
+    downloads.enqueue({ mode, mode.starts_with("spotify-")
+        ? bang::DownloadService::Backend::SpotDl : bang::DownloadService::Backend::YtDlp });
     {
         std::unique_lock lock(mutex);
         if (!signal.wait_for(lock, std::chrono::seconds(5), [&] { return finished; })) {
@@ -73,12 +78,16 @@ bool runCase(const fs::path& root, const std::string& mode, std::size_t expected
                                       : bang::DownloadService::State::Completed),
         mode + ": status");
     if (failed) {
-        ok &= check(result.message.find(mode == "missing-second" ? "missing file" : "unavailable")
+        const std::string reason = mode.starts_with("spotify-") ? "no matching audio found"
+            : mode == "missing-second" ? "missing file" : "unavailable";
+        ok &= check(result.message.find(reason)
                 != std::string::npos,
             mode + ": retains failure reason");
-        ok &= check(result.message.find(std::to_string(expectedCount) + " tracks imported")
-                != std::string::npos,
-            mode + ": reports partial success");
+        if (expectedCount > 0) {
+            ok &= check(result.message.find(std::to_string(expectedCount) + " tracks imported")
+                    != std::string::npos,
+                mode + ": reports partial success");
+        }
     }
     const auto history = catalog.recentDownloads();
     ok &= check(history.size() == 1 && history[0].message == result.message,
@@ -93,6 +102,9 @@ int main(int argc, char** argv)
     if (fs::path(argv[0]).filename() == "yt-dlp") {
         return runDownloader(argv[1]);
     }
+    if (fs::path(argv[0]).filename() == "spotdl") {
+        return runDownloader(argv[2]);
+    }
     char directory[] = "/tmp/bang-download-test-XXXXXX";
     const char* temporary = ::mkdtemp(directory);
     if (temporary == nullptr) {
@@ -101,6 +113,7 @@ int main(int argc, char** argv)
     const fs::path root(temporary);
     fs::create_directories(root / "bin");
     fs::create_symlink(fs::canonical(argv[0]), root / "bin/yt-dlp");
+    fs::create_symlink(fs::canonical(argv[0]), root / "bin/spotdl");
     ::setenv("BANG_TEST_FIXTURES", root.c_str(), 1);
     ::setenv("XDG_DATA_HOME", root.c_str(), 1);
     const auto ffmpeg = bang::ProcessRunner::findExecutable("ffmpeg");
@@ -125,6 +138,8 @@ int main(int argc, char** argv)
     bool ok = runCase(root, "all-tracks", 3);
     ok &= runCase(root, "missing-second", 2);
     ok &= runCase(root, "exit-error", 3);
+    ok &= runCase(root, "spotify-nonzero", 0);
+    ok &= runCase(root, "spotify-zero", 0);
     fs::remove_all(root);
     return ok ? 0 : 1;
 }
