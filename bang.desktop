@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Bang
+Comment=Native music player and library manager for Wayland
+Exec=bang
+Icon=bang
+Terminal=false
+Categories=AudioVideo;Audio;Player;
+StartupNotify=true
