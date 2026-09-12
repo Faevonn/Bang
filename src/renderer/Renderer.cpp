@@ -67,7 +67,7 @@ struct Renderer::Impl {
     VkCommandPool commandPool = nullptr;
     VkCommandBuffer commandBuffer = nullptr;
     VkSemaphore imageAvailable = nullptr;
-    VkSemaphore renderFinished = nullptr;
+    std::vector<VkSemaphore> renderFinished;
     VkFence frameFence = nullptr;
 
     VkBuffer cornerBuffer = nullptr;
@@ -326,6 +326,11 @@ void Renderer::Impl::pickDevice()
 
 void Renderer::Impl::destroySwapchainObjects()
 {
+    vkDeviceWaitIdle(device);
+    for (const VkSemaphore semaphore : renderFinished) {
+        vkDestroySemaphore(device, semaphore, nullptr);
+    }
+    renderFinished.clear();
     for (const VkImageView view : swapchainViews) {
         vkDestroyImageView(device, view, nullptr);
     }
@@ -407,6 +412,19 @@ void Renderer::Impl::createSwapchain()
     vkGetSwapchainImagesKHR(device, swapchain, &actualCount, nullptr);
     swapchainImages.resize(actualCount);
     vkGetSwapchainImagesKHR(device, swapchain, &actualCount, swapchainImages.data());
+
+    // Reacquiring an image retires its previous presentation semaphore wait.
+    // The frame fence only covers rendering, not presentation.
+    renderFinished.resize(actualCount);
+    VkSemaphoreCreateInfo semaphoreInfo {
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO
+    };
+    for (VkSemaphore& semaphore : renderFinished) {
+        if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &semaphore)
+            != VK_SUCCESS) {
+            fail("vkCreateSemaphore(present)");
+        }
+    }
 
     for (const VkImage image : swapchainImages) {
         VkImageViewCreateInfo viewInfo {
@@ -743,9 +761,7 @@ void Renderer::Impl::createPipeline()
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO
     };
     if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailable)
-            != VK_SUCCESS
-        || vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinished)
-            != VK_SUCCESS) {
+        != VK_SUCCESS) {
         fail("vkCreateSemaphore");
     }
     VkFenceCreateInfo fenceInfo { .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
@@ -905,10 +921,8 @@ Renderer::~Renderer()
     if (impl_ == nullptr) {
         return;
     }
-    vkDeviceWaitIdle(impl_->device);
     impl_->destroySwapchainObjects();
     vkDestroyFence(impl_->device, impl_->frameFence, nullptr);
-    vkDestroySemaphore(impl_->device, impl_->renderFinished, nullptr);
     vkDestroySemaphore(impl_->device, impl_->imageAvailable, nullptr);
     vkDestroyCommandPool(impl_->device, impl_->commandPool, nullptr);
     vkDestroyDescriptorPool(impl_->device, impl_->descriptorPool, nullptr);
@@ -1152,7 +1166,7 @@ bool Renderer::render(std::vector<Instance> instances)
     submit.commandBufferCount = 1;
     submit.pCommandBuffers = &impl_->commandBuffer;
     submit.signalSemaphoreCount = 1;
-    submit.pSignalSemaphores = &impl_->renderFinished;
+    submit.pSignalSemaphores = &impl_->renderFinished[imageIndex];
     const VkResult submitResult = vkQueueSubmit(impl_->queue, 1, &submit, impl_->frameFence);
     if (submitResult != VK_SUCCESS) {
         std::fprintf(stderr, "bang: vkQueueSubmit=%d\n", (int)submitResult);
@@ -1161,7 +1175,7 @@ bool Renderer::render(std::vector<Instance> instances)
 
     VkPresentInfoKHR present { .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
     present.waitSemaphoreCount = 1;
-    present.pWaitSemaphores = &impl_->renderFinished;
+    present.pWaitSemaphores = &impl_->renderFinished[imageIndex];
     present.swapchainCount = 1;
     present.pSwapchains = &impl_->swapchain;
     present.pImageIndices = &imageIndex;
